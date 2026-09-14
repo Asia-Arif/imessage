@@ -1,8 +1,6 @@
 import { create } from "zustand";
-import { axiosInstance } from "../lib/axios";
+import { API_BASE_URL, axiosInstance } from "../lib/axios";
 import { io } from "socket.io-client";
-
-const BASE_URL = import.meta.env.MODE === "development" ? "http://localhost:3000" : "/";
 
 export const useAuthStore = create((set, get) => ({
   authUser: null,
@@ -34,7 +32,7 @@ export const useAuthStore = create((set, get) => ({
   connectSocket: (user) => {
     if (!user || get().socket?.connected) return;
 
-    const socket = io(BASE_URL, { query: { userId: user._id } });
+    const socket = io(API_BASE_URL, { query: { userId: String(user._id) } });
 
     set({ socket });
 

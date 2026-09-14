@@ -6,12 +6,18 @@ import AuthPage from "./pages/AuthPage";
 import { useAuth } from "@clerk/react";
 import PageLoader from "./components/PageLoader";
 import { useAuthStore } from "./store/useAuthStore";
-import { useEffect } from "react";
+import { setClerkGetToken } from "./lib/axios";
+import { useEffect, useLayoutEffect } from "react";
 
 import { Toaster } from "react-hot-toast";
 
 function App() {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isSignedIn, isLoaded, getToken } = useAuth();
+
+  useLayoutEffect(() => {
+    setClerkGetToken(getToken);
+    return () => setClerkGetToken(null);
+  }, [getToken]);
 
   // option 1
   // const { checkAuth, isCheckingAuth, clearAuth } = useAuthStore();

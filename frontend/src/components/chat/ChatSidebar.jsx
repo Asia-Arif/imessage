@@ -15,12 +15,12 @@ function mapUserForList(user, onlineUsers) {
     name: user.fullName,
     avatarUrl: user.profilePic,
     initials: getInitials(user.fullName),
-    isOnline: onlineUsers.includes(user._id),
+    isOnline: onlineUsers.some((onlineUserId) => String(onlineUserId) === String(user._id)),
     peer: {
       name: user.fullName,
       avatarUrl: user.profilePic,
       initials: getInitials(user.fullName),
-      isOnline: onlineUsers.includes(user._id),
+      isOnline: onlineUsers.some((onlineUserId) => String(onlineUserId) === String(user._id)),
     },
   };
 }
@@ -137,7 +137,9 @@ function ChatSidebar() {
 
         <Tabs.Panel id="users" className="flex-1 overflow-x-hidden overflow-y-auto outline-none">
           {filteredUsers.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-muted">No people match your search.</p>
+            <p className="px-4 py-6 text-center text-sm text-muted">
+              {normalizedSearchQuery ? "No people match your search." : "No other users yet."}
+            </p>
           ) : (
             filteredUsers.map((user) => (
               <ConversationRow
