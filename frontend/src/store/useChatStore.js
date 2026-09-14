@@ -76,8 +76,32 @@ export const useChatStore = create(
           get().getConversations();
           return true;
         } catch (error) {
-          toast.error(error.response?.data?.message || "Failed to send message");
+          if (error.response?.status === 402) {
+            await get().createCheckoutSession();
+            return false;
+          }
+
+          toast.error(
+            error.response?.data?.message || "Failed to send message"
+          );
+
           return false;
+        }
+      },
+      createCheckoutSession: async () => {
+        try {
+          const res = await axiosInstance.post(
+            "/payments/create-checkout-session"
+          );
+
+          if (res.data.url) {
+            window.location.href = res.data.url;
+          }
+        } catch (error) {
+          toast.error(
+            error.response?.data?.message ||
+            "Unable to start subscription"
+          );
         }
       },
 

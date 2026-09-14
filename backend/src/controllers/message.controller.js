@@ -73,17 +73,42 @@ export async function sendMessage(req, res) {
         const { id: receiverId } = req.params;
         const senderId = req.user._id;
 
+        const user = await User.findById(senderId);
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found",
+            });
+        }
+
+        // Allow unlimited messages for active subscribers
+        if (user.subscriptionStatus !== "active") {
+            // Allow only first 2 free messages
+            if (user.freeChatsUsed >= 2) {
+                return res.status(402).json({
+                    message: "Free trial ended. Please subscribe to continue.",
+                    subscriptionRequired: true,
+                });
+            }
+        }
+
         let imageUrl;
         let videoUrl;
 
         if (req.file) {
             if (!hasImageKitConfig()) {
-                return res.status(500).json({ message: "Media upload is not configured" });
+                return res.status(500).json({
+                    message: "Media upload is not configured",
+                });
             }
 
             const url = await uploadChatMedia(req.file);
-            if (req.file.mimetype.startsWith("video/")) videoUrl = url;
-            else imageUrl = url;
+
+            if (req.file.mimetype.startsWith("video/")) {
+                videoUrl = url;
+            } else {
+                imageUrl = url;
+            }
         }
 
         const newMessage = new Message({
@@ -96,8 +121,14 @@ export async function sendMessage(req, res) {
 
         await newMessage.save();
 
+        // Count only free-trial messages
+        if (user.subscriptionStatus !== "active") {
+            user.freeChatsUsed += 1;
+            await user.save();
+        }
+
         const receiverSocketId = getReceiverSocketId(receiverId);
-        // only send the message in realtime if user is online
+
         if (receiverSocketId) {
             io.to(receiverSocketId).emit("newMessage", newMessage);
         }
@@ -105,6 +136,9 @@ export async function sendMessage(req, res) {
         res.status(201).json(newMessage);
     } catch (error) {
         console.error("Error in sendMessage:", error.message);
-        res.status(500).json({ message: "Internal server error" });
+
+        res.status(500).json({
+            message: "Internal server error",
+        });
     }
 }
