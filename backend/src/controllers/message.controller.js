@@ -1,3 +1,4 @@
+
 import User from "../models/user.model.js";
 import Message from "../models/message.model.js";
 import { hasImageKitConfig, uploadChatMedia } from "../lib/imagekit.js";
@@ -7,7 +8,9 @@ export async function getUsersForSidebar(req, res) {
     try {
         const loggedInUserId = req.user._id;
 
-        const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } }).select("-clerkId");
+        const filteredUsers = await User.find({
+            _id: { $ne: loggedInUserId },
+        }).select("-clerkId");
 
         res.status(200).json(filteredUsers);
     } catch (error) {
@@ -21,24 +24,45 @@ export async function getConversationsForSidebar(req, res) {
         const loggedInUserId = req.user._id;
 
         const conversations = await Message.aggregate([
-            // 1. Keep only the messages I sent or received.
-            { $match: { $or: [{ senderId: loggedInUserId }, { receiverId: loggedInUserId }] } },
-            // 2. Collapse them into one row per chat partner, noting our latest message time.
+            {
+                $match: {
+                    $or: [
+                        { senderId: loggedInUserId },
+                        { receiverId: loggedInUserId },
+                    ],
+                },
+            },
             {
                 $group: {
-                    // The partner is the other person on the message (not me).
-                    _id: { $cond: [{ $eq: ["$senderId", loggedInUserId] }, "$receiverId", "$senderId"] },
+                    _id: {
+                        $cond: [
+                            { $eq: ["$senderId", loggedInUserId] },
+                            "$receiverId",
+                            "$senderId",
+                        ],
+                    },
                     lastMessageAt: { $max: "$createdAt" },
                 },
             },
-            // 3. Put the most recent conversation at the top.
             { $sort: { lastMessageAt: -1 } },
-            // 4. Look up each partner's user profile (comes back as an array).
-            { $lookup: { from: "users", localField: "_id", foreignField: "_id", as: "user" } },
-            // 5. Pull that profile out of the array and make it the document.
-            { $replaceRoot: { newRoot: { $first: "$user" } } },
-            // 6. Hide the private clerkId field from the result.
-            { $project: { clerkId: 0 } },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "_id",
+                    foreignField: "_id",
+                    as: "user",
+                },
+            },
+            {
+                $replaceRoot: {
+                    newRoot: { $first: "$user" },
+                },
+            },
+            {
+                $project: {
+                    clerkId: 0,
+                },
+            },
         ]);
 
         res.status(200).json(conversations);
@@ -81,12 +105,36 @@ export async function sendMessage(req, res) {
             });
         }
 
-        // Allow unlimited messages for active subscribers
+        // Active subscribers can chat with unlimited people.
         if (user.subscriptionStatus !== "active") {
-            // Allow only first 2 free messages
-            if (user.freeChatsUsed >= 2) {
+            // Find all people this user has already chatted with.
+            const previousMessages = await Message.find({
+                $or: [
+                    { senderId },
+                    { receiverId: senderId },
+                ],
+            }).select("senderId receiverId");
+
+            const chatPartnerIds = new Set();
+
+            previousMessages.forEach((message) => {
+                const partnerId =
+                    String(message.senderId) === String(senderId)
+                        ? String(message.receiverId)
+                        : String(message.senderId);
+
+                chatPartnerIds.add(partnerId);
+            });
+
+            const receiverAlreadyChatted =
+                chatPartnerIds.has(String(receiverId));
+
+            // Allow unlimited messages with the existing 2 people.
+            // Block only when trying to start a chat with a 3rd person.
+            if (chatPartnerIds.size >= 2 && !receiverAlreadyChatted) {
                 return res.status(402).json({
-                    message: "Free trial ended. Please subscribe to continue.",
+                    message:
+                        "You have reached the free chat limit. Please subscribe to chat with more people.",
                     subscriptionRequired: true,
                 });
             }
@@ -121,12 +169,6 @@ export async function sendMessage(req, res) {
 
         await newMessage.save();
 
-        // Count only free-trial messages
-        if (user.subscriptionStatus !== "active") {
-            user.freeChatsUsed += 1;
-            await user.save();
-        }
-
         const receiverSocketId = getReceiverSocketId(receiverId);
 
         if (receiverSocketId) {
@@ -142,3 +184,4 @@ export async function sendMessage(req, res) {
         });
     }
 }
+
