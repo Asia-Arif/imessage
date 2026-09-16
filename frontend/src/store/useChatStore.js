@@ -1,4 +1,3 @@
-
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -23,27 +22,36 @@ export const useChatStore = create(
       isSoundEnabled: true,
       isSendingMedia: false,
 
-      // Subscription confirmation modal
       showSubscriptionModal: false,
 
       getUsers: async () => {
         set({ isUsersLoading: true });
 
         try {
-          const res = await axiosInstance.get("/messages/users");
-          const users = Array.isArray(res.data) ? res.data : [];
+          const res = await axiosInstance.get(
+            "/messages/users"
+          );
+
+          const users = Array.isArray(res.data)
+            ? res.data
+            : [];
 
           set((state) => ({
             users,
             selectedUser:
               state.selectedUser &&
-              users.some((user) => user._id === state.selectedUser._id)
+              users.some(
+                (user) =>
+                  user._id ===
+                  state.selectedUser._id
+              )
                 ? state.selectedUser
                 : null,
           }));
         } catch (error) {
           toast.error(
-            error.response?.data?.message || "Failed to load users"
+            error.response?.data?.message ||
+              "Failed to load users"
           );
         } finally {
           set({ isUsersLoading: false });
@@ -51,39 +59,67 @@ export const useChatStore = create(
       },
 
       getConversations: async () => {
-        set({ isConversationsLoading: true });
+        set({
+          isConversationsLoading: true,
+        });
 
         try {
-          const res = await axiosInstance.get("/messages/conversations");
-          set({ conversations: res.data });
+          const res = await axiosInstance.get(
+            "/messages/conversations"
+          );
+
+          set({
+            conversations: Array.isArray(res.data)
+              ? res.data
+              : [],
+          });
         } catch (error) {
-          console.log("Error in getConversations", error.message);
+          console.log(
+            "Error in getConversations",
+            error.message
+          );
         } finally {
-          set({ isConversationsLoading: false });
+          set({
+            isConversationsLoading: false,
+          });
         }
       },
 
       getMessages: async (userId) => {
         if (!userId) return;
 
-        set({ isMessagesLoading: true });
+        set({
+          isMessagesLoading: true,
+        });
 
         try {
-          const res = await axiosInstance.get(`/messages/${userId}`);
-          set({ messages: res.data });
+          const res = await axiosInstance.get(
+            `/messages/${userId}`
+          );
+
+          set({
+            messages: Array.isArray(res.data)
+              ? res.data
+              : [],
+          });
         } catch (error) {
           toast.error(
-            error.response?.data?.message || "Failed to load messages"
+            error.response?.data?.message ||
+              "Failed to load messages"
           );
         } finally {
-          set({ isMessagesLoading: false });
+          set({
+            isMessagesLoading: false,
+          });
         }
       },
 
       sendMessage: async (messageData) => {
-        const { selectedUser, messages } = get();
+        const { selectedUser } = get();
 
-        if (!selectedUser) return false;
+        if (!selectedUser) {
+          return false;
+        }
 
         try {
           const res = await axiosInstance.post(
@@ -91,23 +127,39 @@ export const useChatStore = create(
             messageData
           );
 
-          set({
-            messages: [...messages, res.data],
+          set((state) => ({
+            messages: [
+              ...state.messages,
+              res.data,
+            ],
             composerText: "",
-          });
+          }));
 
           get().getConversations();
 
           return true;
         } catch (error) {
-          if (error.response?.status === 402) {
-            // Show confirmation first instead of directly opening Stripe
-            set({ showSubscriptionModal: true });
+          /*
+           * FREE CHAT LIMIT REACHED
+           *
+           * Backend returns 402 when the user tries
+           * to chat with a 3rd unique person.
+           */
+          if (
+            error.response?.status === 402 ||
+            error.response?.data
+              ?.subscriptionRequired === true
+          ) {
+            set({
+              showSubscriptionModal: true,
+            });
+
             return false;
           }
 
           toast.error(
-            error.response?.data?.message || "Failed to send message"
+            error.response?.data?.message ||
+              "Failed to send message"
           );
 
           return false;
@@ -116,9 +168,10 @@ export const useChatStore = create(
 
       createCheckoutSession: async () => {
         try {
-          const res = await axiosInstance.post(
-            "/payments/create-checkout-session"
-          );
+          const res =
+            await axiosInstance.post(
+              "/payments/create-checkout-session"
+            );
 
           if (res.data.url) {
             window.location.href = res.data.url;
@@ -131,93 +184,164 @@ export const useChatStore = create(
         }
       },
 
-      // Close subscription confirmation
       closeSubscriptionModal: () => {
-        set({ showSubscriptionModal: false });
+        set({
+          showSubscriptionModal: false,
+        });
       },
 
-      // User confirmed subscription
       confirmSubscription: async () => {
-        set({ showSubscriptionModal: false });
+        set({
+          showSubscriptionModal: false,
+        });
 
         await get().createCheckoutSession();
       },
 
       subscribeToMessages: (userId) => {
-        if (!userId) return;
-
-        const socket = useAuthStore.getState().socket;
+        const socket =
+          useAuthStore.getState().socket;
 
         if (!socket) return;
 
         socket.off("newMessage");
 
-        socket.on("newMessage", (newMessage) => {
-          // if im not the receiver don't do anything just return
-          if (String(newMessage.senderId) !== String(userId)) return;
+        socket.on(
+          "newMessage",
+          (newMessage) => {
+            const currentUser =
+              useAuthStore.getState().authUser;
 
-          set({
-            messages: [...get().messages, newMessage],
-          });
+            if (!currentUser) return;
 
-          get().getConversations();
-        });
+            if (
+              String(newMessage.senderId) ===
+              String(currentUser._id)
+            ) {
+              return;
+            }
+
+            if (
+              String(newMessage.senderId) ===
+              String(userId)
+            ) {
+              set((state) => ({
+                messages: [
+                  ...state.messages,
+                  newMessage,
+                ],
+              }));
+            }
+
+            get().getConversations();
+          }
+        );
       },
 
       unsubscribeFromMessages: () => {
-        const socket = useAuthStore.getState().socket;
+        const socket =
+          useAuthStore.getState().socket;
+
         socket?.off("newMessage");
       },
 
-      setSelectedUser: (selectedUser) => set({ selectedUser }),
+      setSelectedUser: (selectedUser) => {
+        set({
+          selectedUser,
+        });
+      },
 
-      setActiveConversationId: (activeConversationId) => {
+      setActiveConversationId: (
+        activeConversationId
+      ) => {
         set((state) => ({
           activeConversationId,
 
           selectedUser:
             state.users.find(
-              (user) => user._id === activeConversationId
+              (user) =>
+                user._id ===
+                activeConversationId
             ) ||
             state.conversations.find(
-              (user) => user._id === activeConversationId
+              (user) =>
+                user._id ===
+                activeConversationId
             ) ||
             null,
 
-          messages: activeConversationId ? state.messages : [],
+          messages: activeConversationId
+            ? state.messages
+            : [],
         }));
       },
 
-      setSearchQuery: (searchQuery) => set({ searchQuery }),
+      setSearchQuery: (searchQuery) => {
+        set({
+          searchQuery,
+        });
+      },
 
-      setSidebarTab: (sidebarTab) => set({ sidebarTab }),
+      setSidebarTab: (sidebarTab) => {
+        set({
+          sidebarTab,
+        });
+      },
 
-      setComposerText: (composerText) => set({ composerText }),
+      setComposerText: (composerText) => {
+        set({
+          composerText,
+        });
+      },
 
-      setSoundEnabled: (isSoundEnabled) => set({ isSoundEnabled }),
+      setSoundEnabled: (isSoundEnabled) => {
+        set({
+          isSoundEnabled,
+        });
+      },
 
-      sendTextMessage: async (conversationId) => {
-        const messageText = get().composerText.trim();
+      sendTextMessage: async (
+        conversationId
+      ) => {
+        const messageText =
+          get().composerText.trim();
 
-        if (!conversationId || !messageText) return false;
+        if (
+          !conversationId ||
+          !messageText
+        ) {
+          return false;
+        }
 
         return get().sendMessage({
           text: messageText,
         });
       },
 
-      sendMediaMessage: async ({ conversationId, file }) => {
-        if (!conversationId || !file) return false;
+      sendMediaMessage: async ({
+        conversationId,
+        file,
+      }) => {
+        if (!conversationId || !file) {
+          return false;
+        }
 
         const formData = new FormData();
+
         formData.append("media", file);
 
-        set({ isSendingMedia: true });
+        set({
+          isSendingMedia: true,
+        });
 
         try {
-          return await get().sendMessage(formData);
+          return await get().sendMessage(
+            formData
+          );
         } finally {
-          set({ isSendingMedia: false });
+          set({
+            isSendingMedia: false,
+          });
         }
       },
     }),
@@ -225,9 +349,9 @@ export const useChatStore = create(
       name: "imessage-storage",
 
       partialize: (state) => ({
-        isSoundEnabled: state.isSoundEnabled,
+        isSoundEnabled:
+          state.isSoundEnabled,
       }),
     }
   )
 );
-

@@ -1,4 +1,3 @@
-
 import { Button, TextArea } from "@heroui/react";
 import {
   ImageIcon,
@@ -11,28 +10,54 @@ import { useChatStore } from "../../store/useChatStore";
 import { useSelectedConversation } from "../../hooks/useSelectedConversation";
 
 export function ChatComposer() {
-  const composerText = useChatStore((state) => state.composerText);
-  const isSoundEnabled = useChatStore((state) => state.isSoundEnabled);
-  const sendMediaMessage = useChatStore((state) => state.sendMediaMessage);
-  const isSendingMedia = useChatStore((state) => state.isSendingMedia);
-  const sendTextMessage = useChatStore((state) => state.sendTextMessage);
-  const setComposerText = useChatStore((state) => state.setComposerText);
-  const [sendingMessage, setSendingMessage] = useState(false);
-
-  const showSubscriptionModal = useChatStore(
-    (state) => state.showSubscriptionModal
+  const composerText = useChatStore(
+    (state) => state.composerText
   );
 
-  const closeSubscriptionModal = useChatStore(
-    (state) => state.closeSubscriptionModal
+  const isSoundEnabled = useChatStore(
+    (state) => state.isSoundEnabled
   );
 
-  const confirmSubscription = useChatStore(
-    (state) => state.confirmSubscription
+  const sendMediaMessage = useChatStore(
+    (state) => state.sendMediaMessage
   );
 
-  const { activeConversationId } = useSelectedConversation();
-  const { playRandomKeyStrokeSound } = useKeyboardSound();
+  const isSendingMedia = useChatStore(
+    (state) => state.isSendingMedia
+  );
+
+  const sendTextMessage = useChatStore(
+    (state) => state.sendTextMessage
+  );
+
+  const setComposerText = useChatStore(
+    (state) => state.setComposerText
+  );
+
+  const showSubscriptionModal =
+    useChatStore(
+      (state) => state.showSubscriptionModal
+    );
+
+  const closeSubscriptionModal =
+    useChatStore(
+      (state) => state.closeSubscriptionModal
+    );
+
+  const confirmSubscription =
+    useChatStore(
+      (state) => state.confirmSubscription
+    );
+
+  const [sendingMessage, setSendingMessage] =
+    useState(false);
+
+  const { activeConversationId } =
+    useSelectedConversation();
+
+  const { playRandomKeyStrokeSound } =
+    useKeyboardSound();
+
   const mediaInputRef = useRef(null);
   const sendingRef = useRef(false);
 
@@ -44,13 +69,22 @@ export function ChatComposer() {
 
   const handleSend = async () => {
     if (sendingRef.current) return;
-    if (!activeConversationId || !composerText.trim()) return;
+
+    if (
+      !activeConversationId ||
+      !composerText.trim()
+    ) {
+      return;
+    }
 
     sendingRef.current = true;
     setSendingMessage(true);
 
     try {
-      const didSendMessage = await sendTextMessage(activeConversationId);
+      const didSendMessage =
+        await sendTextMessage(
+          activeConversationId
+        );
 
       if (didSendMessage) {
         playSoundIfEnabled();
@@ -61,22 +95,29 @@ export function ChatComposer() {
     }
   };
 
-  const handleComposerTextChange = (event) => {
+  const handleComposerTextChange = (
+    event
+  ) => {
     setComposerText(event.target.value);
     playSoundIfEnabled();
   };
 
-  const handleMediaPick = async (event) => {
-    const file = event.target.files?.[0];
+  const handleMediaPick = async (
+    event
+  ) => {
+    const file =
+      event.target.files?.[0];
 
     event.target.value = "";
 
     if (!file) return;
 
-    const didSendMessage = await sendMediaMessage({
-      conversationId: activeConversationId,
-      file,
-    });
+    const didSendMessage =
+      await sendMediaMessage({
+        conversationId:
+          activeConversationId,
+        file,
+      });
 
     if (didSendMessage) {
       playSoundIfEnabled();
@@ -93,7 +134,10 @@ export function ChatComposer() {
               strokeWidth={2}
               aria-hidden
             />
-            <span className="truncate">Uploading media...</span>
+
+            <span className="truncate">
+              Uploading media...
+            </span>
           </div>
         ) : null}
 
@@ -114,7 +158,9 @@ export function ChatComposer() {
             isIconOnly
             isDisabled={isSendingMedia}
             className="size-9 shrink-0 touch-manipulation self-end text-accent"
-            onPress={() => mediaInputRef.current?.click()}
+            onPress={() =>
+              mediaInputRef.current?.click()
+            }
           >
             <ImageIcon
               className="size-5 sm:size-6"
@@ -128,10 +174,16 @@ export function ChatComposer() {
             placeholder="iMessage"
             rows={1}
             value={composerText}
-            onChange={handleComposerTextChange}
+            onChange={
+              handleComposerTextChange
+            }
             onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
+              if (
+                event.key === "Enter" &&
+                !event.shiftKey
+              ) {
                 event.preventDefault();
+
                 if (!sendingRef.current) {
                   handleSend();
                 }
@@ -143,7 +195,10 @@ export function ChatComposer() {
           <Button
             variant="primary"
             isIconOnly
-            isDisabled={!composerText.trim() || sendingMessage}
+            isDisabled={
+              !composerText.trim() ||
+              sendingMessage
+            }
             onPress={handleSend}
           >
             <SendHorizontalIcon className="size-5" />
@@ -159,21 +214,26 @@ export function ChatComposer() {
             </h2>
 
             <p className="mt-3 text-sm text-muted">
-              You have reached your free chat limit. Would you like to
-              subscribe to continue chatting?
+              You have reached your free chat
+              limit. Would you like to subscribe
+              to continue chatting?
             </p>
 
             <div className="mt-6 flex justify-end gap-3">
               <Button
                 variant="light"
-                onPress={closeSubscriptionModal}
+                onPress={
+                  closeSubscriptionModal
+                }
               >
                 No, Maybe Later
               </Button>
 
               <Button
                 color="primary"
-                onPress={confirmSubscription}
+                onPress={
+                  confirmSubscription
+                }
               >
                 Yes, Subscribe
               </Button>
