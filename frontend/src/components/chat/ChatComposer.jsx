@@ -5,7 +5,7 @@ import {
   LoaderIcon,
   SendHorizontalIcon,
 } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import useKeyboardSound from "../../hooks/useKeyboardSound";
 import { useChatStore } from "../../store/useChatStore";
 import { useSelectedConversation } from "../../hooks/useSelectedConversation";
@@ -17,6 +17,7 @@ export function ChatComposer() {
   const isSendingMedia = useChatStore((state) => state.isSendingMedia);
   const sendTextMessage = useChatStore((state) => state.sendTextMessage);
   const setComposerText = useChatStore((state) => state.setComposerText);
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   const showSubscriptionModal = useChatStore(
     (state) => state.showSubscriptionModal
@@ -33,6 +34,7 @@ export function ChatComposer() {
   const { activeConversationId } = useSelectedConversation();
   const { playRandomKeyStrokeSound } = useKeyboardSound();
   const mediaInputRef = useRef(null);
+  const sendingRef = useRef(false);
 
   const playSoundIfEnabled = () => {
     if (isSoundEnabled) {
@@ -41,10 +43,21 @@ export function ChatComposer() {
   };
 
   const handleSend = async () => {
-    const didSendMessage = await sendTextMessage(activeConversationId);
+    if (sendingRef.current) return;
+    if (!activeConversationId || !composerText.trim()) return;
 
-    if (didSendMessage) {
-      playSoundIfEnabled();
+    sendingRef.current = true;
+    setSendingMessage(true);
+
+    try {
+      const didSendMessage = await sendTextMessage(activeConversationId);
+
+      if (didSendMessage) {
+        playSoundIfEnabled();
+      }
+    } finally {
+      sendingRef.current = false;
+      setSendingMessage(false);
     }
   };
 
@@ -119,7 +132,9 @@ export function ChatComposer() {
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
-                handleSend();
+                if (!sendingRef.current) {
+                  handleSend();
+                }
               }
             }}
             className="flex-1 rounded-full"
@@ -128,7 +143,7 @@ export function ChatComposer() {
           <Button
             variant="primary"
             isIconOnly
-            isDisabled={!composerText.trim()}
+            isDisabled={!composerText.trim() || sendingMessage}
             onPress={handleSend}
           >
             <SendHorizontalIcon className="size-5" />
