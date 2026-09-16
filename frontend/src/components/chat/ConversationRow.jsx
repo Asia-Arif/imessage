@@ -1,7 +1,11 @@
 import { Avatar } from "@heroui/react";
 import { AvatarWithOnlineIndicator } from "./AvatarWithOnlineIndicator";
 
-export function ConversationRow({ user, selected, onSelect }) {
+export function ConversationRow({
+  user,
+  selected,
+  onSelect,
+}) {
   return (
     <button
       type="button"
@@ -10,15 +14,36 @@ export function ConversationRow({ user, selected, onSelect }) {
         selected ? "bg-accent-soft" : ""
       }`}
     >
-      <AvatarWithOnlineIndicator isOnline={user.isOnline ?? true}>
-        <Avatar className="size-12 shrink-0">
-          <Avatar.Image alt={user.name} src={user.avatarUrl} />
-          <Avatar.Fallback className="text-sm font-medium">{user.initials}</Avatar.Fallback>
-        </Avatar>
-      </AvatarWithOnlineIndicator>
+      <div className="relative shrink-0">
+        {/* Green online indicator */}
+        <AvatarWithOnlineIndicator
+          isOnline={user.isOnline ?? true}
+        >
+          <Avatar className="size-12 shrink-0">
+            <Avatar.Image
+              alt={user.name}
+              src={user.avatarUrl}
+            />
+
+            <Avatar.Fallback className="text-sm font-medium">
+              {user.initials}
+            </Avatar.Fallback>
+          </Avatar>
+        </AvatarWithOnlineIndicator>
+
+        {/* Blue new-message indicator */}
+        {user.hasUnreadMessage && !selected ? (
+          <span
+            className="absolute -right-0.5 -top-0.5 size-3 rounded-full border-2 border-background bg-blue-500"
+            aria-label="New message"
+          />
+        ) : null}
+      </div>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px] font-semibold">{user.name}</p>
+        <p className="truncate text-[15px] font-semibold">
+          {user.name}
+        </p>
       </div>
     </button>
   );

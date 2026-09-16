@@ -24,6 +24,9 @@ export const useChatStore = create(
 
       showSubscriptionModal: false,
 
+      // Users who have sent a new/unread message
+      unreadMessageIds: [],
+
       getUsers: async () => {
         set({ isUsersLoading: true });
 
@@ -102,6 +105,15 @@ export const useChatStore = create(
               ? res.data
               : [],
           });
+
+          // Opening this conversation marks its messages as read
+          set((state) => ({
+            unreadMessageIds:
+              state.unreadMessageIds.filter(
+                (id) =>
+                  String(id) !== String(userId)
+              ),
+          }));
         } catch (error) {
           toast.error(
             error.response?.data?.message ||
@@ -214,6 +226,7 @@ export const useChatStore = create(
 
             if (!currentUser) return;
 
+            // Ignore our own message
             if (
               String(newMessage.senderId) ===
               String(currentUser._id)
@@ -221,18 +234,59 @@ export const useChatStore = create(
               return;
             }
 
+            const senderId = String(
+              newMessage.senderId
+            );
+
+            const currentConversationId = userId
+              ? String(userId)
+              : null;
+
+            /*
+             * If message is from the currently open chat,
+             * show it directly without unread indicator.
+             */
             if (
-              String(newMessage.senderId) ===
-              String(userId)
+              currentConversationId === senderId
             ) {
               set((state) => ({
                 messages: [
                   ...state.messages,
                   newMessage,
                 ],
+
+                unreadMessageIds:
+                  state.unreadMessageIds.filter(
+                    (id) =>
+                      String(id) !== senderId
+                  ),
               }));
+            } else {
+              /*
+               * Message is from another user.
+               * Add that user's ID to unread list.
+               */
+              set((state) => {
+                const alreadyUnread =
+                  state.unreadMessageIds.some(
+                    (id) =>
+                      String(id) === senderId
+                  );
+
+                if (alreadyUnread) {
+                  return state;
+                }
+
+                return {
+                  unreadMessageIds: [
+                    ...state.unreadMessageIds,
+                    senderId,
+                  ],
+                };
+              });
             }
 
+            // Keep conversation list updated
             get().getConversations();
           }
         );
@@ -273,6 +327,14 @@ export const useChatStore = create(
           messages: activeConversationId
             ? state.messages
             : [],
+
+          // Opening chat clears its unread indicator
+          unreadMessageIds:
+            state.unreadMessageIds.filter(
+              (id) =>
+                String(id) !==
+                String(activeConversationId)
+            ),
         }));
       },
 
@@ -351,6 +413,10 @@ export const useChatStore = create(
       partialize: (state) => ({
         isSoundEnabled:
           state.isSoundEnabled,
+
+        // Keep unread state after refresh
+        unreadMessageIds:
+          state.unreadMessageIds,
       }),
     }
   )
